@@ -1,9 +1,15 @@
-import { Router } from "express";
-import { transportadoras } from "./transportadoras";
-import { documentos } from "./documentos";
-import { frete } from "./frete";
+// src/index.ts
+import express from 'express';
+import transportadorasRouter from './transportadoras';
 
-export const routes = Router();
-routes.use(transportadoras);
-routes.use(documentos);
-routes.use(frete);
+const app = express();
+app.use(express.json());
+
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
+app.use('/transportadoras', transportadorasRouter);
+
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+app.listen(PORT, () => {
+  console.log(`TransOptima API ouvindo em http://localhost:${PORT}`);
+});

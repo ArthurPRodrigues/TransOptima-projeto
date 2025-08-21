@@ -1,95 +1,49 @@
-import { Router } from "express";
-import { z } from "zod";
-import { prisma } from "../lib/prisma";
-import { recalcForTransportadora } from "../services/availability";
+// src/routes/transportadoras.ts
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { batchDisponibilidade } from '../services/availability';
 
-export const transportadoras = Router();
+const prisma = new PrismaClient();
+const router = Router();
 
-const createSchema = z.object({
-  razaoSocial: z.string().min(2),
-  cnpj: z.string().min(11),
-  uf: z.string().length(2),
-  quimicosControlados: z.boolean().optional().default(false)
-});
-
-transportadoras.post("/transportadoras", async (req, res, next) => {
+/**
+ * GET /transportadoras?uf=SC&produto=quimico
+ * Requer que o model Transportadora tenha os campos:
+ *   - uf: String
+ *   - tiposProduto: String[]   (array no Postgres)
+ */
+router.get('/', async (req, res) => {
   try {
-    const data = createSchema.parse(req.body);
-    const t = await prisma.transportadora.create({ data });
-    await recalcForTransportadora(t.id);
-    res.status(201).json(t);
-  } catch (e) { next(e); }
-});
+    const { uf, produto } = req.query as { uf?: string; produto?: string };
 
-transportadoras.get("/transportadoras", async (_req, res, next) => {
-  try {
-    const list = await prisma.transportadora.findMany({ orderBy: { razaoSocial: "asc" } });
-    res.json(list);
-  } catch (e) { next(e); }
-});
+    // >>> ESTE É O TRECHO QUE VOCÊ PERGUNTOU “AONDE VAI?” <<<
+    const where: any = {};
+    if (uf) where.uf = uf.toString().toUpperCase();
+    if (produto) where.tiposProduto = { has: produto.toString().toLowerCase() };
+    // <<< FIM DO TRECHO >>>
 
-transportadoras.get("/transportadoras/:id", async (req, res, next) => {
-  try {
-    const id = Number(req.params.id);
-    const t = await prisma.transportadora.findUnique({ where: { id } });
-    if (!t) return res.status(404).json({ message: "Não encontrada" });
-    res.json(t);
-  } catch (e) { next(e); }
-});
-
-// Documentos da transportadora
-const regDocSchema = z.object({
-  documentoId: z.number().int().optional(),
-  documentoCodigo: z.string().optional(),
-  validade: z.string().datetime({ offset: false }).optional(), // ISO yyyy-mm-dd ou yyyy-mm-ddTHH:MM:SS
-  urlArquivo: z.string().url().optional()
-}).refine(d => d.documentoId || d.documentoCodigo, {
-  message: "Informe documentoId ou documentoCodigo"
-});
-
-transportadoras.get("/transportadoras/:id/documentos", async (req, res, next) => {
-  try {
-    const transportadoraId = Number(req.params.id);
-    const docs = await prisma.registroDocumento.findMany({
-      where: { transportadoraId },
-      include: { documento: true }
+    const items = await prisma.transportadora.findMany({
+      where,
+      orderBy: { id: 'asc' },
     });
-    res.json(docs);
-  } catch (e) { next(e); }
-});
 
-transportadoras.post("/transportadoras/:id/documentos", async (req, res, next) => {
-  try {
-    const transportadoraId = Number(req.params.id);
-    const data = regDocSchema.parse(req.body);
+    if (!items.length) return res.json({ disponiveis: [], indisponiveis: [] });
 
-    let documentoId = data.documentoId ?? null;
-    if (!documentoId && data.documentoCodigo) {
-      const doc = await prisma.documento.findUnique({ where: { codigo: data.documentoCodigo } });
-      if (!doc) return res.status(400).json({ message: "Documento código inválido" });
-      documentoId = doc.id;
+    const ids = items.map(t => t.id);
+    const dispMap = await batchDisponibilidade(ids);
+
+    const disponiveis: typeof items = [];
+    const indisponiveis: typeof items = [];
+
+    for (const t of items) {
+      (dispMap.get(t.id) ? disponiveis : indisponiveis).push(t);
     }
 
-    const created = await prisma.registroDocumento.create({
-      data: {
-        transportadoraId,
-        documentoId: documentoId!,
-        validade: data.validade ? new Date(data.validade) : null,
-        urlArquivo: data.urlArquivo ?? null
-      }
-    });
-
-    await recalcForTransportadora(transportadoraId);
-    res.status(201).json(created);
-  } catch (e) { next(e); }
+    return res.json({ disponiveis, indisponiveis });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Falha ao listar transportadoras' });
+  }
 });
 
-transportadoras.delete("/transportadoras/:id/documentos/:registroId", async (req, res, next) => {
-  try {
-    const transportadoraId = Number(req.params.id);
-    const registroId = Number(req.params.registroId);
-    await prisma.registroDocumento.delete({ where: { id: registroId } });
-    await recalcForTransportadora(transportadoraId);
-    res.status(204).send();
-  } catch (e) { next(e); }
-});
+export default router;

@@ -8,16 +8,18 @@ datasource db {
 }
 
 model Transportadora {
-  id                   Int                  @id @default(autoincrement())
+  id                   Int                 @id @default(autoincrement())
   razaoSocial          String
-  cnpj                 String               @unique
-  uf                   String               @db.VarChar(2)
-  quimicosControlados  Boolean              @default(false)
-  disponivelParaFrete  Boolean              @default(false)
+  cnpj                 String              @unique
+  uf                   String              @db.VarChar(2)   // << adicionar
+  tiposProduto         String[]            @default([])     // << opcional (Postgres array)
+  quimicosControlados  Boolean             @default(false)
+  disponivelParaFrete  Boolean?            // se existir; senão pode remover
   registros            RegistroDocumento[]
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 }
+
 
 model Documento {
   id             Int                  @id @default(autoincrement())

@@ -1,33 +1,50 @@
-import { prisma } from "../lib/prisma";
+// src/services/availability.ts
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
-export async function recalcForTransportadora(transportadoraId: number) {
-  const t = await prisma.transportadora.findUnique({ where: { id: transportadoraId } });
-  if (!t) throw new Error("Transportadora não encontrada");
-
-  const requiredDocs = await prisma.documento.findMany({
-    where: t.quimicosControlados ? { obgQuimicos: true } : { obgNaoQuimicos: true },
-    select: { id: true, codigo: true }
-  });
-
-  const regs = await prisma.registroDocumento.findMany({
-    where: { transportadoraId },
-    select: { documentoId: true, validade: true }
-  });
+/** Disponibilidade = todos os docs obrigatórios estão válidos hoje. */
+export async function computeDisponivelParaFrete(transportadoraId: number): Promise<boolean> {
+  const docs = await prisma.documento.findMany({ select: { id: true } });
+  if (docs.length === 0) return true;
 
   const today = new Date();
-  const ok = requiredDocs.every(req =>
-    regs.some(r => r.documentoId === req.id && (!r.validade || r.validade >= today))
-  );
+  today.setHours(0, 0, 0, 0);
 
-  await prisma.transportadora.update({
-    where: { id: transportadoraId },
-    data: { disponivelParaFrete: ok }
+  // última validade por documento para a transportadora (uma query)
+  const grouped = await prisma.registroDocumento.groupBy({
+    by: ['documentoId'],
+    where: { transportadoraId },
+    _max: { validade: true },
   });
 
-  return ok;
+  const latestByDoc = new Map<number, Date | null>(
+    grouped.map(g => [g.documentoId, g._max.validade])
+  );
+
+  for (const { id } of docs) {
+    const validade = latestByDoc.get(id);
+    if (!validade || validade < today) return false;
+  }
+  return true;
 }
 
-export async function recalcAll() {
-  const all = await prisma.transportadora.findMany({ select: { id: true } });
-  for (const t of all) await recalcForTransportadora(t.id);
+/** Recalcula e tenta persistir no campo disponivelParaFrete (se existir). */
+export async function recalcDisponibilidade(transportadoraId: number) {
+  const disponivel = await computeDisponivelParaFrete(transportadoraId);
+  try {
+    await prisma.transportadora.update({
+      where: { id: transportadoraId },
+      data: { disponivelParaFrete: disponivel as any }, // se o campo não existir, o try/catch ignora
+    });
+  } catch {}
+  return disponivel;
+}
+
+/** Batch para a listagem. */
+export async function batchDisponibilidade(transportadoraIds: number[]) {
+  const map = new Map<number, boolean>();
+  for (const id of transportadoraIds) {
+    map.set(id, await computeDisponivelParaFrete(id));
+  }
+  return map;
 }

@@ -1,23 +1,8 @@
-import { buildApp } from "./app";
-import { env } from "./config/env";
-import { recalcAll } from "./services/availability";
-import cron from "node-cron";
+import { buildApp } from './app';
 
 const app = buildApp();
+const PORT = Number(process.env.PORT || 8080);
 
-app.listen(env.PORT, async () => {
-  console.log(`TransOptima API ouvindo na porta ${env.PORT}`);
-  // Recalcula disponibilidade ao subir
-  try { await recalcAll(); } catch (e) { console.warn("recalcAll falhou:", e); }
+app.listen(PORT, () => {
+  console.log(`TransOptima API ouvindo em http://localhost:${PORT}`);
 });
-
-// Agendamento diário às 03:00 America/Sao_Paulo
-cron.schedule("0 0 3 * * *", async () => {
-  try {
-    console.log("[cron] Recalculando disponibilidade...");
-    await recalcAll();
-    console.log("[cron] OK");
-  } catch (e) {
-    console.error("[cron] falhou", e);
-  }
-}, { timezone: "America/Sao_Paulo" });

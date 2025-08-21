@@ -1,35 +1,16 @@
 version: "3.9"
 services:
   db:
-    image: postgres:16
-    container_name: transoptima_db
+    image: postgres:16-alpine
+    container_name: transoptima-db
+    restart: unless-stopped
     environment:
+      POSTGRES_USER: transoptima
+      POSTGRES_PASSWORD: transoptima
       POSTGRES_DB: transoptima
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build: .
-    container_name: transoptima_api
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PORT: 8080
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/transoptima?schema=public
-      NODE_ENV: production
-      API_KEY: supersecreta # opcional (ver middleware abaixo)
-    ports:
-      - "8080:8080"
-
 volumes:
   db_data:

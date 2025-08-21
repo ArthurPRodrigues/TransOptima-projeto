@@ -1,28 +1,42 @@
-import { PrismaClient } from "@prisma/client";
+// prisma/seed.cjs
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const tipos = [
-  { codigo: "CNPJ", nome: "Cartão CNPJ", obgQuimicos: true, obgNaoQuimicos: true },
-  { codigo: "APOLICE", nome: "Apólice de Seguro", obgQuimicos: true, obgNaoQuimicos: true },
-  { codigo: "ANTT", nome: "ANTT", obgQuimicos: true, obgNaoQuimicos: true },
-  { codigo: "ALVARA", nome: "Alvará de Funcionamento", obgQuimicos: true, obgNaoQuimicos: true },
-  // Específicos de químicos controlados
-  { codigo: "ALVARA_PC", nome: "Alvará Polícia Civil", obgQuimicos: true, obgNaoQuimicos: false },
-  { codigo: "EXERCITO", nome: "Certificação Exército", obgQuimicos: true, obgNaoQuimicos: false },
-  { codigo: "LIC_FUNC_PF", nome: "Licença Funcionamento PF", obgQuimicos: true, obgNaoQuimicos: false },
-  { codigo: "IBAMA", nome: "IBAMA", obgQuimicos: true, obgNaoQuimicos: false },
-  { codigo: "FATMA", nome: "FATMA/IMA", obgQuimicos: true, obgNaoQuimicos: false }
-];
-
 async function main() {
+  // Ajuste nomes/campos se no seu schema forem diferentes
+  const tipos = [
+    { nome: 'ANTT - RNTRC', diasAntecedenciaAviso: 30 },
+    { nome: 'Licença Ambiental', diasAntecedenciaAviso: 45 },
+    { nome: 'Seguro RCTR-C', diasAntecedenciaAviso: 30 },
+    { nome: 'Certidão Negativa Federal', diasAntecedenciaAviso: 15 },
+    { nome: 'Certidão Negativa Estadual', diasAntecedenciaAviso: 15 },
+    { nome: 'Alvará de Funcionamento', diasAntecedenciaAviso: 30 },
+  ];
+
   for (const t of tipos) {
-    await prisma.documento.upsert({
-      where: { codigo: t.codigo },
-      update: t,
-      create: t,
+    const existente = await prisma.tipoDocumento.findFirst({
+      where: { nome: t.nome },
+      select: { id: true },
     });
+
+    if (existente) {
+      await prisma.tipoDocumento.update({
+        where: { id: existente.id },
+        data: { diasAntecedenciaAviso: t.diasAntecedenciaAviso },
+      });
+    } else {
+      await prisma.tipoDocumento.create({ data: t });
+    }
   }
-  console.log("Tipos de documento seed: OK");
+
+  console.log('✅ Seed de TipoDocumento concluído.');
 }
 
-main().finally(async () => prisma.$disconnect());
+main()
+  .catch((e) => {
+    console.error('❌ Erro no seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
