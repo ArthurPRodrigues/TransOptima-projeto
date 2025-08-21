@@ -1,5 +1,17 @@
+# deps e builds
 node_modules
 dist
-.env
 *.log
+
+# prisma
 .prisma
+.env
+.env.local
+
+# front (Vite)
+web/node_modules
+web/dist
+
+# SO
+.DS_Store
+Thumbs.db
