@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>TransOptima — Disponibilidade</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; }
+    .row { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+    h2 { margin-top: 24px; }
+    input, select, button { padding: 8px 10px; border: 1px solid #ccc; border-radius: 8px; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>TransOptima</h1>
+
+  <div class="row card">
+    <div>
+      <label>UF</label><br/>
+      <input id="uf" placeholder="SC"/>
+    </div>
+    <div>
+      <label>Produto</label><br/>
+      <input id="produto" placeholder="quimico"/>
+    </div>
+    <div>
+      <button id="btnBuscar">Buscar</button>
+    </div>
+    <div>
+      <button id="btnNotify">Disparar e-mail agora</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card" style="flex:1; min-width:320px;">
+      <h2>Disponíveis</h2>
+      <table id="tbDisp"><thead><tr><th>ID</th><th>Razão Social</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card" style="flex:1; min-width:320px;">
+      <h2>Indisponíveis</h2>
+      <table id="tbIndisp"><thead><tr><th>ID</th><th>Razão Social</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:24px;">
+    <h2>Novo RegistroDocumento</h2>
+    <div class="row">
+      <div><label>Transportadora ID</label><br/><input id="tId" type="number" /></div>
+      <div><label>Documento ID</label><br/><input id="dId" type="number" /></div>
+      <div><label>Validade</label><br/><input id="val" type="date" /></div>
+      <div><label>Número (opcional)</label><br/><input id="num" /></div>
+      <div><label>Arquivo URL (opcional)</label><br/><input id="url" /></div>
+      <div><button id="btnAdd">Cadastrar</button></div>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+function renderRows(id, items) {
+  const tbody = $(`#${id} tbody`);
+  tbody.innerHTML = items.map(t => `<tr><td>${t.id}</td><td>${t.razaoSocial || ''}</td></tr>`).join('');
+}
+
+async function buscar() {
+  const uf = $('#uf').value.trim();
+  const produto = $('#produto').value.trim();
+  const params = new URLSearchParams();
+  if (uf) params.set('uf', uf);
+  if (produto) params.set('produto', produto);
+  const res = await fetch('/transportadoras?' + params.toString());
+  const data = await res.json();
+  renderRows('tbDisp', data.disponiveis || []);
+  renderRows('tbIndisp', data.indisponiveis || []);
+}
+
+async function addRegistro() {
+  const body = {
+    transportadoraId: Number($('#tId').value),
+    documentoId: Number($('#dId').value),
+    validade: $('#val').value,
+    numero: $('#num').value || undefined,
+    arquivoUrl: $('#url').value || undefined,
+  };
+  const res = await fetch('/registros', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const data = await res.json();
+  $('#msg').textContent = res.ok ? 'Registro salvo. Disponível: ' + data.disponivel : (data.error || 'Falha');
+  await buscar();
+}
+
+async function notifyNow() {
+  const res = await fetch('/admin/notify-now', { method:'POST' });
+  const data = await res.json();
+  alert(res.ok ? `OK! Emails enviados: ${data.count}` : 'Falha ao disparar');
+}
+
+$('#btnBuscar').addEventListener('click', buscar);
+$('#btnAdd').addEventListener('click', addRegistro);
+$('#btnNotify').addEventListener('click', notifyNow);
+
+// primeira carga
+buscar();
+</script>
+</body>
+</html>
