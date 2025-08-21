@@ -11,8 +11,8 @@ model Transportadora {
   id                   Int                 @id @default(autoincrement())
   razaoSocial          String
   cnpj                 String              @unique
-  uf                   String              @db.VarChar(2)   // << adicionar
-  tiposProduto         String[]            @default([])     // << opcional (Postgres array)
+  uf                   String              @db.VarChar(2)   
+  tiposProduto         String[]            @default([])     
   quimicosControlados  Boolean             @default(false)
   disponivelParaFrete  Boolean?            // se existir; senão pode remover
   registros            RegistroDocumento[]
@@ -22,23 +22,25 @@ model Transportadora {
 
 
 model Documento {
-  id             Int                  @id @default(autoincrement())
-  codigo         String               @unique
-  nome           String
-  obgQuimicos    Boolean              @default(false)
-  obgNaoQuimicos Boolean              @default(false)
-  registros      RegistroDocumento[]
+  id                    Int      @id @default(autoincrement())
+  nome                  String   @unique
+  diasAntecedenciaAviso Int      @default(7)   // RF005/RN04
+  obrigatorio           Boolean  @default(true)
+  registros             RegistroDocumento[]
 }
 
 model RegistroDocumento {
-  id               Int           @id @default(autoincrement())
+  id               Int            @id @default(autoincrement())
   transportadoraId Int
   documentoId      Int
-  validade         DateTime?
-  urlArquivo       String?
+  numero           String?
+  emissao          DateTime?
+  validade         DateTime
+  arquivoUrl       String?
+  ativo            Boolean        @default(true) // RN01: somente um “ativo” por par
 
-  transportadora   Transportadora @relation(fields: [transportadoraId], references: [id], onDelete: Cascade)
-  documento        Documento      @relation(fields: [documentoId], references: [id], onDelete: Restrict)
+  transportadora   Transportadora @relation(fields: [transportadoraId], references: [id])
+  documento        Documento      @relation(fields: [documentoId], references: [id])
 
-  createdAt        DateTime       @default(now())
+  @@index([transportadoraId, documentoId, validade])
 }
