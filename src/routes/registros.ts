@@ -6,6 +6,11 @@ import { recalcDisponibilidade } from '../services/availability';
 const prisma = new PrismaClient();
 const router = Router();
 
+// desativa anterior ativo (mesmo par), mantendo histórico
+// These lines use top-level await and should be moved inside an async function or removed.
+// If needed, move this logic inside the router.post handler below.
+
+
 // Create
 router.post('/', async (req, res) => {
   try {

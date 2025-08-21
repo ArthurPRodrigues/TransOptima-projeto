@@ -10,12 +10,13 @@ export async function computeDisponivelParaFrete(transportadoraId: number): Prom
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // última validade por documento para a transportadora (uma query)
-  const grouped = await prisma.registroDocumento.groupBy({
-    by: ['documentoId'],
-    where: { transportadoraId },
-    _max: { validade: true },
-  });
+const grouped = await prisma.registroDocumento.groupBy({
+  by: ['documentoId'],
+  where: { transportadoraId }, // removido 'ativo'
+  _max: { validade: true },
+});
+
+
 
   const latestByDoc = new Map<number, Date | null>(
     grouped.map(g => [g.documentoId, g._max.validade])

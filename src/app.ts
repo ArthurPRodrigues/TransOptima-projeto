@@ -1,5 +1,6 @@
 import express from 'express';
 import transportadorasRouter from './routes/transportadoras';
+import relatoriosRouter from './routes/relatorios'; 
 import registrosRouter from './routes/registros';
 import adminRouter from './routes/admin';
 import { startEmailNotifier } from './jobs/emailNotifier';
@@ -19,6 +20,7 @@ export function buildApp() {
   app.use('/transportadoras', transportadorasRouter);
   app.use('/registros', registrosRouter);
   app.use('/admin', adminRouter);
+  app.use('/relatorios', relatoriosRouter);
 
   // inicia o cron
   startEmailNotifier();

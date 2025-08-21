@@ -21,12 +21,13 @@ export async function runExpiringCheck() {
     include: { documento: true, transportadora: true },
   });
 
-  // Filtra apenas os que "batem" com o aviso do documento
+  // antes de enviar:
   const pendentes = registros.filter(r => {
+    if (!r.validade) return false;
     const dias = diffInDays(today, new Date(r.validade));
-    const aviso = (r as any).documento?.diasAntecedenciaAviso ?? 30; // fallback
-    return dias === aviso;
+    return dias === 7; // 7 dias fixos
   });
+
 
   if (pendentes.length === 0) return { sent: false, count: 0 };
 
