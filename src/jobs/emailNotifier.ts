@@ -39,7 +39,7 @@ export async function runExpiringCheck() {
       <td>${t?.id ?? ''}</td>
       <td>${t?.razaoSocial ?? '(sem nome)'}</td>
       <td>${d?.nome ?? '(doc)'}</td>
-      <td>${new Date(r.validade).toISOString().slice(0,10)}</td>
+      <td>${r.validade ? new Date(r.validade).toISOString().slice(0,10) : ''}</td>
     </tr>`;
   }).join('');
 
