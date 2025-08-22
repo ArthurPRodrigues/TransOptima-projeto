@@ -1,5 +1,3 @@
-# ✅ Versão 1 – TransOptima
-
 ## Funcionalidades Implementadas
 
 1. **CRUD de Transportadoras**  
