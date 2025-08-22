@@ -1,32 +1,29 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import './index.css'
-import { AuthProvider } from './auth'
-import App, { RequireAuth } from './App'
-import Login from './pages/Login'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import Layout from './layout/Layout'
-import TransportadorasPage from './pages/Transportadoras'
-import DocumentosPage from './pages/Documentos'
-import VencidosPage from './pages/Vencidos'
+import Login from './pages/Login'
+import Transportadoras from './pages/Transportadoras'
+import Documentos from './pages/Documentos'
+import Vencidos from './pages/Vencidos'
+import './index.css'
+
+const router = createBrowserRouter([
+  { path: '/login', element: <Login /> },
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      { index: true, element: <Transportadoras /> },
+      { path: 'transportadoras', element: <Transportadoras /> },
+      { path: 'documentos', element: <Documentos /> },
+      { path: 'vencidos', element: <Vencidos /> },
+    ],
+  },
+])
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<App/>}>
-            <Route path="/login" element={<Login/>} />
-            <Route path="/app" element={<RequireAuth><Layout/></RequireAuth>}>
-              <Route index element={<Navigate to="transportadoras" replace/>}/>
-              <Route path="transportadoras" element={<TransportadorasPage/>}/>
-              <Route path="documentos" element={<DocumentosPage/>}/>
-              <Route path="vencidos" element={<VencidosPage/>}/>
-            </Route>
-            <Route path="*" element={<Navigate to="/login" replace/>}/>
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <RouterProvider router={router} />
   </React.StrictMode>
 )

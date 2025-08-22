@@ -1,63 +1,84 @@
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-const r = Router();
+// src/routes/admin.transportadoras.ts
+import { Router } from 'express'
+import { PrismaClient } from '@prisma/client'
 
-/**
- * OBS: Para evitar erro se seu schema NÃO tiver 'uf' e 'tiposProduto',
- * este CRUD salva apenas 'razaoSocial' e 'cnpj'.
- * (Quando você migrar o schema, a gente atualiza para salvar UF etc.)
- */
+const prisma = new PrismaClient()
+const r = Router()
 
 // LISTAR
 r.get('/', async (_req, res) => {
-  const rows = await prisma.transportadora.findMany({ orderBy: { id: 'asc' } });
-  res.json(rows);
-});
+  try {
+    const rows = await prisma.transportadora.findMany({ orderBy: { id: 'asc' } })
+    return res.json(rows)
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'Falha ao listar transportadoras.' })
+  }
+})
 
-// CRIAR (somente campos garantidos no schema básico)
+// CREATE
 r.post('/', async (req, res) => {
   try {
-    const { razaoSocial, cnpj } = req.body || {};
-    if (!razaoSocial || !cnpj) {
-      return res.status(400).json({ error: 'razaoSocial e cnpj são obrigatórios' });
-    }
-    const created = await prisma.transportadora.create({
-      data: { razaoSocial, cnpj },
-    });
-    res.status(201).json(created);
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || 'Falha ao criar' });
-  }
-});
+    let { razaoSocial, cnpj, uf } = req.body || {}
 
-// ATUALIZAR
+    if (!razaoSocial || !cnpj || !uf) {
+      return res
+        .status(400)
+        .json({ error: 'razaoSocial, cnpj e uf são obrigatórios' })
+    }
+
+    uf = String(uf).trim().toUpperCase()
+    if (!/^[A-Z]{2}$/.test(uf)) {
+      return res.status(400).json({ error: 'UF inválida (use sigla, ex: SP)' })
+    }
+
+    const created = await prisma.transportadora.create({
+      data: { razaoSocial, cnpj, uf },
+    })
+    return res.status(201).json(created)
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'Falha ao criar transportadora.' })
+  }
+})
+
+// UPDATE
 r.put('/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    const { razaoSocial, cnpj } = req.body || {};
-    const updated = await prisma.transportadora.update({
-      where: { id },
-      data: {
-        ...(razaoSocial !== undefined && { razaoSocial }),
-        ...(cnpj !== undefined && { cnpj }),
-      },
-    });
-    res.json(updated);
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || 'Falha ao atualizar' });
-  }
-});
+    const id = Number(req.params.id)
+    const data: any = {}
 
-// EXCLUIR
+    const { razaoSocial, cnpj, uf } = req.body || {}
+
+    if (typeof razaoSocial !== 'undefined') data.razaoSocial = razaoSocial
+    if (typeof cnpj !== 'undefined') data.cnpj = cnpj
+
+    if (typeof uf !== 'undefined') {
+      const u = String(uf).trim().toUpperCase()
+      if (!/^[A-Z]{2}$/.test(u)) {
+        return res.status(400).json({ error: 'UF inválida (use sigla, ex: SP)' })
+      }
+      data.uf = u
+    }
+
+    const updated = await prisma.transportadora.update({ where: { id }, data })
+    return res.json(updated)
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'Falha ao atualizar transportadora.' })
+  }
+})
+
+// DELETE
 r.delete('/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    await prisma.transportadora.delete({ where: { id } });
-    res.json({ ok: true });
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || 'Falha ao excluir' });
+    const id = Number(req.params.id)
+    await prisma.transportadora.delete({ where: { id } })
+    return res.json({ ok: true })
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'Falha ao excluir transportadora.' })
   }
-});
+})
 
-export default r;
+export default r

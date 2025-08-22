@@ -1,35 +1,61 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth'
-import { Truck, FileText, AlarmClock, LogOut } from 'lucide-react'
+// web/src/layout/Layout.tsx
+import React from 'react'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Truck, FileText, TriangleAlert, LogOut } from 'lucide-react'
 
-export default function Layout(){
-  const { logout } = useAuth()
-  const nav = useNavigate()
-  function handleLogout(){ logout(); nav('/login') }
+export default function Layout() {
+  const navigate = useNavigate()
 
-  const item = (to:string, icon:JSX.Element, label:string)=>(
-    <NavLink to={to} className={({isActive})=>
-      `flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-teal-50 ${isActive?'bg-teal-100 text-teal-800':'text-slate-700'}`
-    }>
-      {icon}<span>{label}</span>
-    </NavLink>
-  )
+  function logout() {
+    localStorage.removeItem('token')
+    navigate('/login')
+  }
+
+  const base =
+    'flex items-center gap-2 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-100'
+  const active = 'bg-slate-200 font-semibold'
 
   return (
-    <div className="min-h-screen grid md:grid-cols-[260px_1fr]">
-      <aside className="bg-white border-r p-4 space-y-4">
-        <div className="text-xl font-bold">TransOptima</div>
-        <nav className="space-y-1">
-          {item('/app/transportadoras', <Truck size={18}/>, 'Transportadoras')}
-          {item('/app/documentos', <FileText size={18}/>, 'Documentos')}
-          {item('/app/vencidos', <AlarmClock size={18}/>, 'Vencidos')}
+    <div className="min-h-screen grid grid-cols-[260px_1fr] bg-slate-50">
+      {/* Sidebar */}
+      <aside className="border-r bg-white flex flex-col">
+        <div className="p-4 text-xl font-bold">TransOptima</div>
+
+        <nav className="px-2 space-y-1">
+          <NavLink
+            to="/transportadoras"
+            className={({ isActive }) => `${base} ${isActive ? active : ''}`}
+          >
+            <Truck size={18} /> Transportadoras
+          </NavLink>
+          <NavLink
+            to="/documentos"
+            className={({ isActive }) => `${base} ${isActive ? active : ''}`}
+          >
+            <FileText size={18} /> Documentos
+          </NavLink>
+          <NavLink
+            to="/vencidos"
+            className={({ isActive }) => `${base} ${isActive ? active : ''}`}
+          >
+            <TriangleAlert size={18} /> Vencidos
+          </NavLink>
         </nav>
-        <button onClick={handleLogout} className="mt-8 flex items-center gap-2 text-slate-600 hover:text-red-600">
-          <LogOut size={18}/> Sair
-        </button>
+
+        <div className="mt-auto p-4">
+          <button
+            onClick={logout}
+            className="w-full inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white hover:opacity-90"
+          >
+            <LogOut size={18} /> Sair
+          </button>
+        </div>
       </aside>
-      <main className="bg-slate-50 p-6">
-        <Outlet/>
+
+      {/* Conteúdo */}
+      <main className="p-6">
+        <Outlet />
       </main>
     </div>
- 
+  )
+}

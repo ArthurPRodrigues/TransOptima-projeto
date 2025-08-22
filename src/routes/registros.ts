@@ -1,162 +1,89 @@
 // src/routes/registros.ts
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { recalcDisponibilidade } from '../services/availability';
+import { Router } from 'express'
+import { PrismaClient } from '@prisma/client'
+import { recalcDisponibilidade } from '../services/availability'
 
-const prisma = new PrismaClient();
-const router = Router();
-
-/**
- * Helper simples de data válida (YYYY-MM-DD, etc.)
- */
-function parseDateOrNull(v: unknown): Date | null {
-  if (!v) return null;
-  const d = new Date(String(v));
-  return isNaN(d.getTime()) ? null : d;
-}
+const prisma = new PrismaClient()
+const r = Router()
 
 /**
- * CREATE
- * RN01: antes de criar, desativa qualquer registro ATIVO do mesmo par
- *       (transportadoraId, documentoId), preservando histórico.
+ * GET /registros?transportadoraId=1&documentoId=2
+ * Lista registros, podendo filtrar por transportadora/documento.
+ * Inclui o "documento" para facilitar o front.
  */
-router.post('/', async (req, res) => {
+r.get('/', async (req, res) => {
   try {
-    const { transportadoraId, documentoId, numero, emissao, validade, arquivoUrl } = req.body || {};
+    const where: any = {}
+    if (req.query.transportadoraId) where.transportadoraId = Number(req.query.transportadoraId)
+    if (req.query.documentoId) where.documentoId = Number(req.query.documentoId)
 
-    if (!transportadoraId || !documentoId || !validade) {
-      return res.status(400).json({ error: 'transportadoraId, documentoId e validade são obrigatórios.' });
-    }
-
-    const tId = Number(transportadoraId);
-    const dId = Number(documentoId);
-    const dtVal = parseDateOrNull(validade);
-    const dtEmi = parseDateOrNull(emissao);
-
-    if (!Number.isFinite(tId) || !Number.isFinite(dId)) {
-      return res.status(400).json({ error: 'transportadoraId/documentoId inválidos.' });
-    }
-    if (!dtVal) {
-      return res.status(400).json({ error: 'validade inválida (use YYYY-MM-DD).' });
-    }
-    if (emissao && !dtEmi) {
-      return res.status(400).json({ error: 'emissao inválida.' });
-    }
-
-    // RN01: exclusividade de ATIVO por par
-    await prisma.registroDocumento.updateMany({
-      where: { transportadoraId: tId, documentoId: dId, ativo: true },
-      data: { ativo: false },
-    });
-
-    const created = await prisma.registroDocumento.create({
-      data: {
-        transportadoraId: tId,
-        documentoId: dId,
-        numero: numero ?? null,
-        arquivoUrl: arquivoUrl ?? null,
-        emissao: dtEmi ?? undefined,
-        validade: dtVal,
-        ativo: true,
-      },
-    });
-
-    const disponivel = await recalcDisponibilidade(tId);
-    return res.status(201).json({ registro: created, disponivel });
+    const rows = await prisma.registroDocumento.findMany({
+      where,
+      orderBy: { id: 'desc' },
+      include: { documento: true },
+    })
+    return res.json(rows)
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: 'Falha ao criar registro de documento.' });
+    console.error(e)
+    return res.status(500).json({ error: 'Falha ao listar registros.' })
   }
-});
+})
 
 /**
- * UPDATE
- * Se após o update o registro permanecer ATIVO, garante RN01 desativando
- * outros ativos do mesmo par (transportadoraId/documentoId).
+ * POST /registros
+ * body: { transportadoraId, documentoId, validade (YYYY-MM-DD), emissao?, numero?, arquivoUrl? }
+ * Regra: desativa o anterior ATIVO do mesmo par (transportadoraId, documentoId).
  */
-router.put('/:id', async (req, res) => {
+r.post('/', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'id inválido.' });
-
-    const old = await prisma.registroDocumento.findUnique({ where: { id } });
-    if (!old) return res.status(404).json({ error: 'Registro não encontrado.' });
-
-    const { numero, emissao, validade, arquivoUrl, documentoId, transportadoraId, ativo } = req.body || {};
-
-    const data: any = {};
-    if (typeof numero !== 'undefined') data.numero = numero;
-    if (typeof arquivoUrl !== 'undefined') data.arquivoUrl = arquivoUrl;
-
-    if (typeof documentoId !== 'undefined') {
-      const dId = Number(documentoId);
-      if (!Number.isFinite(dId)) return res.status(400).json({ error: 'documentoId inválido.' });
-      data.documentoId = dId;
+    const { transportadoraId, documentoId, numero, emissao, validade, arquivoUrl } = req.body || {}
+    if (!transportadoraId || !documentoId || !validade) {
+      return res
+        .status(400)
+        .json({ error: 'transportadoraId, documentoId e validade são obrigatórios.' })
     }
-    if (typeof transportadoraId !== 'undefined') {
-      const tId = Number(transportadoraId);
-      if (!Number.isFinite(tId)) return res.status(400).json({ error: 'transportadoraId inválido.' });
-      data.transportadoraId = tId;
+
+    const v = new Date(validade)
+    if (isNaN(v.getTime())) {
+      return res.status(400).json({ error: 'validade inválida (use YYYY-MM-DD).' })
+    }
+
+    const data: any = {
+      transportadoraId: Number(transportadoraId),
+      documentoId: Number(documentoId),
+      validade: v,
+      numero: numero ?? null,
+      arquivoUrl: arquivoUrl ?? null,
+      ativo: true,
     }
 
     if (typeof emissao !== 'undefined') {
-      const dtEmi = emissao ? parseDateOrNull(emissao) : null;
-      if (emissao && !dtEmi) return res.status(400).json({ error: 'emissao inválida.' });
-      data.emissao = dtEmi;
-    }
-    if (typeof validade !== 'undefined') {
-      const dtVal = parseDateOrNull(validade);
-      if (!dtVal) return res.status(400).json({ error: 'validade inválida.' });
-      data.validade = dtVal;
+      const e = emissao ? new Date(emissao) : null
+      if (e && isNaN(e.getTime())) return res.status(400).json({ error: 'emissao inválida.' })
+      data.emissao = e
     }
 
-    if (typeof ativo !== 'undefined') {
-      data.ativo = Boolean(ativo);
-    }
+    // Desativar o registro anterior ATIVO para este par
+    await prisma.registroDocumento.updateMany({
+      where: {
+        transportadoraId: data.transportadoraId,
+        documentoId: data.documentoId,
+        ativo: true,
+      },
+      data: { ativo: false },
+    })
 
-    const updated = await prisma.registroDocumento.update({ where: { id }, data });
+    // Criar o novo registro
+    const created = await prisma.registroDocumento.create({ data })
 
-    // RN01: se o registro ficou ATIVO, desativa outros ativos do mesmo par
-    if (updated.ativo) {
-      const pairTransportadoraId = updated.transportadoraId;
-      const pairDocumentoId = updated.documentoId;
-      await prisma.registroDocumento.updateMany({
-        where: {
-          id: { not: updated.id },
-          transportadoraId: pairTransportadoraId,
-          documentoId: pairDocumentoId,
-          ativo: true,
-        },
-        data: { ativo: false },
-      });
-    }
+    // Recalcular disponibilidade da transportadora
+    const disponivel = await recalcDisponibilidade(data.transportadoraId)
 
-    const disponivel = await recalcDisponibilidade(updated.transportadoraId);
-    return res.json({ registro: updated, disponivel });
+    return res.status(201).json({ registro: created, disponivel })
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: 'Falha ao atualizar registro de documento.' });
+    console.error(e)
+    return res.status(500).json({ error: 'Falha ao criar registro de documento.' })
   }
-});
+})
 
-/**
- * DELETE
- */
-router.delete('/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'id inválido.' });
-
-    const old = await prisma.registroDocumento.findUnique({ where: { id } });
-    if (!old) return res.status(404).json({ error: 'Registro não encontrado.' });
-
-    await prisma.registroDocumento.delete({ where: { id } });
-    const disponivel = await recalcDisponibilidade(old.transportadoraId);
-    return res.json({ ok: true, disponivel });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: 'Falha ao excluir registro de documento.' });
-  }
-});
-
-export default router;
+export default r
