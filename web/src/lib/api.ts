@@ -20,6 +20,19 @@ export async function getTransportadoras(params: { uf?: string; produto?: string
   return (await res.json()) as ListResp;
 }
 
+// web/src/lib/api.ts
+export async function downloadVencidosCsv() {
+  const r = await fetch('/api/relatorios/vencidos?formato=csv');
+  if (!r.ok) throw new Error('Falha ao gerar CSV');
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'vencidos.csv';
+  document.body.appendChild(a); a.click();
+  a.remove(); URL.revokeObjectURL(url);
+}
+
+
 export async function postRegistro(body: {
   transportadoraId: number
   documentoId: number

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getTransportadoras, postRegistro, notifyNow, type ListResp } from './lib/api'
+import { getTransportadoras, postRegistro, notifyNow, downloadVencidosCsv, type ListResp } from './lib/api'
 import { Card, CardHeader, Grid2, Field, Input, Button } from './components/FormUI'
 import './index.css'
 
@@ -46,11 +46,8 @@ export default function App() {
       setN(''); setU('');
       await buscar()
     } catch (e: unknown) {
-      if (e instanceof Error) {
-        setMsg('Erro: ' + (e.message || 'falha ao salvar'))
-      } else {
-        setMsg('Erro: falha ao salvar')
-      }
+      if (e instanceof Error) setMsg('Erro: ' + (e.message || 'falha ao salvar'))
+      else setMsg('Erro: falha ao salvar')
     }
   }
 
@@ -78,8 +75,29 @@ export default function App() {
               </Field>
             </Grid2>
             <div className="mt-4 flex gap-3">
-              <Button onClick={()=>buscar({ uf, produto })} className="bg-teal-600 text-white">Buscar</Button>
-              <Button onClick={async()=>{ const r=await notifyNow(); alert(`Disparo ok. Documentos: ${r.count}`) }} className="border border-gray-300 bg-white">Disparar e-mail agora</Button>
+              <Button
+                onClick={() => buscar({ uf, produto })}
+                className="bg-teal-600 text-white"
+              >
+                Buscar
+              </Button>
+
+              <Button
+                onClick={async () => {
+                  const r = await notifyNow()
+                  alert(`Disparo ok. Documentos: ${r.count}`)
+                }}
+                className="border border-gray-300 bg-white"
+              >
+                Disparar e-mail agora
+              </Button>
+
+              <Button
+                onClick={downloadVencidosCsv}
+                className="border border-gray-300 bg-white"
+              >
+                Baixar CSV (vencidos)
+              </Button>
             </div>
           </div>
         </Card>
@@ -100,7 +118,7 @@ export default function App() {
           </Card>
         </div>
 
-        {/* Formulário 2 colunas (estilo da imagem) */}
+        {/* Formulário 2 colunas */}
         <Card>
           <CardHeader title="Cadastrar Registro de Documento" />
           <div className="p-6">
@@ -111,14 +129,12 @@ export default function App() {
               <Field label="Documento ID">
                 <Input placeholder="1" inputMode="numeric" value={documentoId} onChange={e=>setD(e.target.value)} />
               </Field>
-
               <Field label="Validade">
                 <Input type="date" value={validade} onChange={e=>setV(e.target.value)} />
               </Field>
               <Field label="Número (opcional)">
                 <Input placeholder="Nº do documento" value={numero} onChange={e=>setN(e.target.value)} />
               </Field>
-
               <Field label="Arquivo URL (opcional)">
                 <Input placeholder="https://..." value={arquivoUrl} onChange={e=>setU(e.target.value)} />
               </Field>
