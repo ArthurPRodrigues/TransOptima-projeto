@@ -24,7 +24,7 @@ model Transportadora {
 model Documento {
   id                    Int      @id @default(autoincrement())
   nome                  String   @unique
-  diasAntecedenciaAviso Int      @default(7)   // RF005/RN04
+  diasAntecedenciaAviso Int      @default(7)
   obrigatorio           Boolean  @default(true)
   registros             RegistroDocumento[]
 }
@@ -37,7 +37,7 @@ model RegistroDocumento {
   emissao          DateTime?
   validade         DateTime
   arquivoUrl       String?
-  ativo            Boolean        @default(true) // RN01: somente um “ativo” por par
+  ativo            Boolean        @default(true)
 
   transportadora   Transportadora @relation(fields: [transportadoraId], references: [id])
   documento        Documento      @relation(fields: [documentoId], references: [id])
