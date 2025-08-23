@@ -67,3 +67,7 @@ export default function DocumentosPage(){
 
 function Field({label, children}:{label:string; children:React.ReactNode}){ return <label className="flex flex-col gap-1 text-sm">{label}{children}</label> }
 function Input(props:React.InputHTMLAttributes<HTMLInputElement>){ return <input {...props} className="border rounded-lg px-3 py-2"/> }
+
+export default function Documentos() {
+  return <h1>Documentos OK</h1>
+}

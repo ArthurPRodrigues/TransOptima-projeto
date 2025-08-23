@@ -34,3 +34,6 @@ export default function VencidosPage(){
     </div>
   )
 }
+export default function Vencidos() {
+  return <h1>Vencidos OK</h1>
+}

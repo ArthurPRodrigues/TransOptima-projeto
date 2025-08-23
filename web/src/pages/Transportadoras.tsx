@@ -376,3 +376,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className="border rounded-lg px-3 py-2 w-full" />
 }
+
+export default function Transportadoras() {
+  return <h1>Transportadoras OK</h1>
+}
+
