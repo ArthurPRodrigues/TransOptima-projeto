@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:13
+    container_name: transoptima_db
+    environment:
+      POSTGRES_USER: transoptima
+      POSTGRES_PASSWORD: transoptima
+      POSTGRES_DB: transoptima
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transoptima -d transoptima"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: node:20-alpine
+    container_name: transoptima_backend
+    working_dir: /app
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      DATABASE_URL: postgres://transoptima:transoptima@db:5432/transoptima?schema=public
+      # se tiver outras variáveis no seu .env, replique-as aqui
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: sh -c "npm ci && npx prisma generate && npx prisma migrate deploy && npm run dev"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:20-alpine
+    container_name: transoptima_frontend
+    working_dir: /app
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://backend:8080
+      CHOKIDAR_USEPOLLING: "1"   # melhora hot-reload em containers
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: sh -c "npm ci && npm run dev -- --host --port 5173"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
