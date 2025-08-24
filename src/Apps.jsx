@@ -3,7 +3,6 @@ import Dashboard from "./pages/Dashboard";
 import Transportadoras from "./pages/Transportadoras";
 import Documentos from "./pages/Documentos";
 import Disponibilidade from "./pages/Disponibilidade";
-import TransportadoraCreate from "./pages/TransportadoraCreate";
 
 function NavItem({ to, label }) {
   return (
@@ -32,7 +31,6 @@ export default function App() {
             <NavItem to="/transportadoras" label="Transportadoras" />
             <NavItem to="/documentos" label="Documentos" />
             <NavItem to="/disponibilidade" label="Disponibilidade" />
-            <NavItem to="/transportadoras/novo" label="Nova Transportadora" />
           </nav>
         </div>
       </header>
@@ -41,7 +39,6 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/transportadoras" element={<Transportadoras />} />
-          <Route path="/transportadoras/novo" element={<TransportadoraCreate />} />
           <Route path="/documentos" element={<Documentos />} />
           <Route path="/disponibilidade" element={<Disponibilidade />} />
           <Route path="*" element={<p>Página não encontrada.</p>} />

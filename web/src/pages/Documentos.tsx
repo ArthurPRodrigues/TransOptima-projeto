@@ -1,73 +1,171 @@
-import { useEffect, useState } from 'react'
-import { createDocumento, deleteDocumento, listDocumentos, updateDocumento, type Documento } from '../lib/api'
+import { useEffect, useState } from "react";
+import { api, Documento } from "../services/api";
 
-export default function DocumentosPage(){
-  const [rows,setRows]=useState<Documento[]>([])
-  const [f,setF]=useState<Partial<Documento>>({nome:'', diasAntecedenciaAviso:7, obrigatorio:true})
-  const [editId,setEditId]=useState<number|null>(null)
-  const [loading,setLoading]=useState(false); const [msg,setMsg]=useState('')
+// Tipos de documentos disponíveis no menu
+const DOC_TYPES = [
+  "ANVISA",
+  "ANTT",
+  "CRLV",
+  "CNH",
+  "Seguro",
+  "Alvará",
+  "Contrato",
+];
 
-  async function load(){ setLoading(true); try{ setRows(await listDocumentos()) } finally{ setLoading(false) } }
-  useEffect(()=>{ load() },[])
+export default function DocumentosPage() {
+  const [docs, setDocs] = useState<Documento[]>([]);
 
-  async function save(){
-    setMsg('')
-    try{
-      if(editId){ await updateDocumento(editId,f); setMsg('Atualizado!') }
-      else { await createDocumento(f); setMsg('Criado!') }
-      setF({nome:'', diasAntecedenciaAviso:7, obrigatorio:true}); setEditId(null); await load()
-    }catch(e:any){ setMsg(e?.message||'Erro ao salvar') }
-  }
-  async function del(id:number){ if(!confirm('Remover?')) return; await deleteDocumento(id); await load() }
-  function startEdit(d:Documento){ setEditId(d.id); setF({nome:d.nome, diasAntecedenciaAviso:d.diasAntecedenciaAviso, obrigatorio:d.obrigatorio}) }
+  // Agora buscamos por CNPJ em vez de ID
+  const [cnpj, setCnpj] = useState("");
+  const [transportadoraId, setTransportadoraId] = useState<string | null>(null);
+
+  // campos do form
+  const [tipo, setTipo] = useState(DOC_TYPES[0]);
+  const [vencimento, setVencimento] = useState("");
+  const [arquivo, setArquivo] = useState<File | null>(null);
+
+  const carregarPorCnpj = async () => {
+    if (!cnpj.trim()) return;
+    const id = await api.resolveTransportadoraIdByCnpj(cnpj.trim());
+    setTransportadoraId(id);
+  };
+
+  const recarregar = async () => {
+    if (!transportadoraId) return;
+    const list = await api.listDocumentosByTransportadora(transportadoraId);
+    setDocs(list);
+  };
+
+  // quando resolver o ID, carrega a lista
+  useEffect(() => {
+    recarregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transportadoraId]);
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!arquivo || !tipo) return;
+
+    // garante que temos o ID mesmo se o usuário só preencheu CNPJ e não clicou "Carregar"
+    let id = transportadoraId;
+    if (!id) {
+      id = await api.resolveTransportadoraIdByCnpj(cnpj.trim());
+      setTransportadoraId(id);
+    }
+    if (!id) return;
+
+    await api.uploadDocumento(id, { tipo, vencimento, arquivo });
+    setVencimento("");
+    setArquivo(null);
+    await recarregar();
+  };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold">Documentos</h1>
+    <div className="bg-white rounded-2xl shadow border p-5">
+      <h2 className="text-lg font-semibold mb-3">Documentos</h2>
 
-      <div className="bg-white rounded-2xl shadow p-4">
-        <div className="grid md:grid-cols-3 gap-3">
-          <Field label="Nome"><Input value={f.nome||''} onChange={e=>setF({...f,nome:e.target.value})}/></Field>
-          <Field label="Antecedência (dias)"><Input type="number" value={f.diasAntecedenciaAviso||7} onChange={e=>setF({...f,diasAntecedenciaAviso:Number(e.target.value)})}/></Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={!!f.obrigatorio} onChange={e=>setF({...f,obrigatorio:e.target.checked})}/>
-            Obrigatório
-          </label>
+      {/* Busca por CNPJ */}
+      <div className="flex flex-col md:flex-row gap-3 items-end mb-4">
+        <div className="flex-1 max-w-md">
+          <label className="block text-sm mb-1">CNPJ da Transportadora</label>
+          <input
+            className="border rounded-lg px-3 py-2 w-full"
+            placeholder="00.000.000/0001-00"
+            value={cnpj}
+            onChange={(e) => setCnpj(e.target.value)}
+          />
         </div>
-        <div className="mt-3 flex gap-2">
-          <button onClick={save} className="px-4 py-2 bg-teal-600 text-white rounded-lg">{editId?'Salvar':'Criar'}</button>
-          {editId && <button onClick={()=>{setEditId(null); setF({nome:'',diasAntecedenciaAviso:7,obrigatorio:true})}} className="px-4 py-2 border rounded-lg">Cancelar</button>}
-        </div>
-        {msg && <div className="text-sm mt-2">{msg}</div>}
+        <button className="px-3 py-2 rounded-lg border" onClick={carregarPorCnpj}>
+          Carregar
+        </button>
+        {transportadoraId && (
+          <span className="text-sm text-gray-600">
+            ID resolvido: <code>{transportadoraId}</code>
+          </span>
+        )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow p-4 overflow-auto">
-        <table className="w-full border-separate border-spacing-y-1">
-          <thead><tr className="text-left text-sm text-gray-600"><th className="px-3 py-2">ID</th><th className="px-3 py-2">Nome</th><th className="px-3 py-2">Dias</th><th className="px-3 py-2">Obrigatório</th><th className="px-3 py-2">Ações</th></tr></thead>
+      {/* Formulário de upload */}
+      <form onSubmit={enviar} className="grid md:grid-cols-4 gap-3 items-end mb-6">
+        <div>
+          <label className="block text-sm mb-1">Tipo</label>
+          <select
+            className="border rounded-lg px-3 py-2 w-full"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            required
+          >
+            {DOC_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Vencimento</label>
+          <input
+            type="date"
+            className="border rounded-lg px-3 py-2 w-full"
+            value={vencimento}
+            onChange={(e) => setVencimento(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Arquivo</label>
+          <input
+            type="file"
+            className="block w-full"
+            onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
+            required
+          />
+        </div>
+        <div>
+          <button className="px-4 py-2 rounded-lg border">Enviar</button>
+        </div>
+      </form>
+
+      {/* Tabela */}
+      <div className="overflow-auto">
+        <table className="min-w-full border rounded-xl overflow-hidden">
+          <thead className="bg-gray-50 text-left text-sm">
+            <tr>
+              <th className="px-3 py-2 border-b">Tipo</th>
+              <th className="px-3 py-2 border-b">Arquivo</th>
+              <th className="px-3 py-2 border-b">Vencimento</th>
+              <th className="px-3 py-2 border-b">Status</th>
+            </tr>
+          </thead>
           <tbody>
-            {rows.map(d=>(
-              <tr key={d.id} className="bg-white hover:bg-gray-50">
-                <td className="px-3 py-2">{d.id}</td>
-                <td className="px-3 py-2">{d.nome}</td>
-                <td className="px-3 py-2">{d.diasAntecedenciaAviso}</td>
-                <td className="px-3 py-2">{d.obrigatorio?'Sim':'Não'}</td>
-                <td className="px-3 py-2 flex gap-2">
-                  <button onClick={()=>startEdit(d)} className="px-3 py-1 border rounded-lg">Editar</button>
-                  <button onClick={()=>del(d.id)} className="px-3 py-1 border rounded-lg">Excluir</button>
+            {docs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-3 py-6 text-center text-gray-500">
+                  Sem documentos
                 </td>
               </tr>
-            ))}
+            ) : (
+              docs.map((d) => (
+                <tr key={d.id} className="text-sm hover:bg-gray-50">
+                  <td className="px-3 py-2 border-b">{d.tipo}</td>
+                  <td className="px-3 py-2 border-b">{d.nomeArquivo}</td>
+                  <td className="px-3 py-2 border-b">
+                    {d.vencimento ? new Date(d.vencimento).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-3 py-2 border-b">
+                    <span
+                      className={`inline-block px-2 py-1 rounded-lg text-xs ${
+                        d.valido ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {d.valido ? "Válido" : "Inválido"}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-        {loading && <div className="text-sm p-2">Carregando…</div>}
       </div>
     </div>
-  )
-}
-
-function Field({label, children}:{label:string; children:React.ReactNode}){ return <label className="flex flex-col gap-1 text-sm">{label}{children}</label> }
-function Input(props:React.InputHTMLAttributes<HTMLInputElement>){ return <input {...props} className="border rounded-lg px-3 py-2"/> }
-
-export default function Documentos() {
-  return <h1>Documentos OK</h1>
+  );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type Transportadora } from "../services/api";
+import { api, Transportadora } from "../services/api";
 import { useDebounce } from "../hooks/useDeBounce";
 
 const UF_LIST = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
@@ -11,7 +11,7 @@ export default function TransportadorasPage() {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
 
-  const [rows, setRows] = useState<Transportadora[]>([]);
+  const [rows, setRows] = useState([] as Transportadora[]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -106,8 +106,20 @@ export default function TransportadorasPage() {
       <div className="flex items-center justify-between mt-4">
         <span className="text-sm text-gray-600">{info}</span>
         <div className="flex gap-2">
-          <button className="px-3 py-2 rounded-lg border disabled:opacity-50" disabled={!canPrev} onClick={()=> setPage(p => Math.max(p-1,0))}>◀ Anterior</button>
-          <button className="px-3 py-2 rounded-lg border disabled:opacity-50" disabled={!canNext} onClick={()=> setPage(p => p+1)}>Próxima ▶</button>
+          <button
+            className="px-3 py-2 rounded-lg border disabled:opacity-50"
+            disabled={!canPrev}
+            onClick={()=> setPage(p => Math.max(p-1,0))}
+          >
+            ◀ Anterior
+          </button>
+          <button
+            className="px-3 py-2 rounded-lg border disabled:opacity-50"
+            disabled={!canNext}
+            onClick={()=> setPage(p => p+1)}
+          >
+            Próxima ▶
+          </button>
         </div>
       </div>
     </div>

@@ -8,39 +8,22 @@ datasource db {
 }
 
 model Transportadora {
-  id                   Int                 @id @default(autoincrement())
-  razaoSocial          String
-  cnpj                 String              @unique
-  uf                   String              @db.VarChar(2)   
-  tiposProduto         String[]            @default([])     
-  quimicosControlados  Boolean             @default(false)
-  disponivelParaFrete  Boolean?            // se existir; senão pode remover
-  registros            RegistroDocumento[]
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  id                   String   @id @default(uuid())
+  nome                 String
+  cnpj                 String   @unique
+  uf                   String
+  disponivelParaFrete  Boolean  @default(false)
+  documentos           Documento[]
+  createdAt            DateTime @default(now())
 }
-
 
 model Documento {
-  id                    Int      @id @default(autoincrement())
-  nome                  String   @unique
-  diasAntecedenciaAviso Int      @default(7)
-  obrigatorio           Boolean  @default(true)
-  registros             RegistroDocumento[]
-}
-
-model RegistroDocumento {
-  id               Int            @id @default(autoincrement())
-  transportadoraId Int
-  documentoId      Int
-  numero           String?
-  emissao          DateTime?
-  validade         DateTime
-  arquivoUrl       String?
-  ativo            Boolean        @default(true)
-
+  id               String   @id @default(uuid())
+  tipo             String
+  nomeArquivo      String
+  vencimento       DateTime?
+  valido           Boolean  @default(true)
   transportadora   Transportadora @relation(fields: [transportadoraId], references: [id])
-  documento        Documento      @relation(fields: [documentoId], references: [id])
-
-  @@index([transportadoraId, documentoId, validade])
+  transportadoraId String
+  createdAt        DateTime @default(now())
 }
