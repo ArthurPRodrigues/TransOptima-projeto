@@ -1,48 +1,89 @@
-// src/routes/transportadoras.ts
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { batchDisponibilidade } from '../services/availability';
+import { Router } from "express";
+import prisma from "../prisma";
+import { onlyDigits } from "../utils/cnpj";
 
-const prisma = new PrismaClient();
 const router = Router();
 
-/**
- * GET /transportadoras?uf=SC&produto=quimico
- * Requer que o model Transportadora tenha os campos:
- *   - uf: String
- *   - tiposProduto: String[]   (array no Postgres)
- */
-router.get('/', async (req, res) => {
+/** Criar */
+router.post("/", async (req, res, next) => {
   try {
-    const { uf, produto } = req.query as { uf?: string; produto?: string };
+    const { nome, cnpj, uf, quimicosControlados } = req.body || {};
+    if (!nome || !cnpj) throw new Error("Campos obrigatórios: nome e cnpj.");
 
-    // >>> ESTE É O TRECHO QUE VOCÊ PERGUNTOU “AONDE VAI?” <<<
-    const where: any = {};
-    if (uf) where.uf = uf.toString().toUpperCase();
-    if (produto) where.tiposProduto = { has: produto.toString().toLowerCase() };
-    // <<< FIM DO TRECHO >>>
-
-    const items = await prisma.transportadora.findMany({
-      where,
-      orderBy: { id: 'asc' },
+    const created = await prisma.transportadora.create({
+      data: {
+        nome: String(nome).trim(),
+        cnpj: onlyDigits(cnpj),
+        uf: uf ? String(uf).toUpperCase().slice(0, 2) : null,
+        quimicosControlados: !!quimicosControlados
+      }
     });
-
-    if (!items.length) return res.json({ disponiveis: [], indisponiveis: [] });
-
-    const ids = items.map(t => t.id);
-    const dispMap = await batchDisponibilidade(ids);
-
-    const disponiveis: typeof items = [];
-    const indisponiveis: typeof items = [];
-
-    for (const t of items) {
-      (dispMap.get(t.id) ? disponiveis : indisponiveis).push(t);
-    }
-
-    return res.json({ disponiveis, indisponiveis });
+    res.status(201).json(created);
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: 'Falha ao listar transportadoras' });
+    next(e);
+  }
+});
+
+/** Listar (filtros: uf, disponivelParaFrete) */
+router.get("/", async (req, res, next) => {
+  try {
+    const { uf, disponivelParaFrete } = req.query as any;
+    const list = await prisma.transportadora.findMany({
+      where: {
+        uf: uf ? String(uf).toUpperCase().slice(0, 2) : undefined,
+        ...(disponivelParaFrete !== undefined
+          ? { disponivelParaFrete: String(disponivelParaFrete) === "true" }
+          : {})
+      },
+      orderBy: { nome: "asc" },
+      select: { id: true, nome: true, cnpj: true, uf: true, disponivelParaFrete: true }
+    });
+    res.json(list);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Buscar por CNPJ */
+router.get("/:cnpj", async (req, res, next) => {
+  try {
+    const cnpj = onlyDigits(req.params.cnpj);
+    const t = await prisma.transportadora.findUnique({ where: { cnpj } });
+    if (!t) return res.status(404).json({ error: "Transportadora não encontrada." });
+    res.json(t);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Atualizar por CNPJ */
+router.put("/:cnpj", async (req, res, next) => {
+  try {
+    const cnpj = onlyDigits(req.params.cnpj);
+    const { nome, uf, quimicosControlados, disponivelParaFrete } = req.body || {};
+    const updated = await prisma.transportadora.update({
+      where: { cnpj },
+      data: {
+        ...(nome !== undefined ? { nome: String(nome).trim() } : {}),
+        ...(uf !== undefined ? { uf: uf ? String(uf).toUpperCase().slice(0, 2) : null } : {}),
+        ...(quimicosControlados !== undefined ? { quimicosControlados: !!quimicosControlados } : {}),
+        ...(disponivelParaFrete !== undefined ? { disponivelParaFrete: !!disponivelParaFrete } : {})
+      }
+    });
+    res.json(updated);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Deletar por CNPJ */
+router.delete("/:cnpj", async (req, res, next) => {
+  try {
+    const cnpj = onlyDigits(req.params.cnpj);
+    await prisma.transportadora.delete({ where: { cnpj } });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
   }
 });
 

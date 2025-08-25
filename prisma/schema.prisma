@@ -8,22 +8,48 @@ datasource db {
 }
 
 model Transportadora {
-  id                   String   @id @default(uuid())
+  id                   String       @id @default(uuid())
   nome                 String
-  cnpj                 String   @unique
-  uf                   String
-  disponivelParaFrete  Boolean  @default(false)
+  cnpj                 String       @unique
+  uf                   String?
+  disponivelParaFrete  Boolean      @default(false)
+  quimicosControlados  Boolean      @default(false)
+
   documentos           Documento[]
-  createdAt            DateTime @default(now())
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+}
+
+model TipoDocumento {
+  id          String       @id @default(uuid())
+  nome        String       @unique
+  slug        String       @unique
+  diasAviso   Int          @default(30)
+  obrigatorio Boolean      @default(true)
+
+  documentos  Documento[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Documento {
-  id               String   @id @default(uuid())
-  tipo             String
-  nomeArquivo      String
-  vencimento       DateTime?
-  valido           Boolean  @default(true)
-  transportadora   Transportadora @relation(fields: [transportadoraId], references: [id])
-  transportadoraId String
-  createdAt        DateTime @default(now())
+  id                String         @id @default(uuid())
+  transportadoraId  String
+  tipoDocumentoId   String
+  nomeOriginal      String
+  caminhoArquivo    String
+  mimeType          String
+  tamanhoBytes      Int
+  validade          DateTime?
+  observacoes       String?
+
+  transportadora    Transportadora @relation(fields: [transportadoraId], references: [id], onDelete: Cascade)
+  tipo              TipoDocumento  @relation(fields: [tipoDocumentoId], references: [id], onDelete: Restrict)
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([transportadoraId])
+  @@index([tipoDocumentoId])
+  @@index([validade])
 }

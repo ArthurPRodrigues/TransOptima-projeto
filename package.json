@@ -1,45 +1,27 @@
 {
-  "name": "transoptima-node",
+  "name": "transoptima",
   "version": "1.0.0",
-  "private": true,
+  "main": "dist/index.js",
+  "type": "commonjs",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "node -r ts-node/register prisma/seed.ts",
-    "seed": "prisma db seed"
+    "prisma:migrate": "prisma migrate dev --name init_transoptima",
+    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "cors": "^2.8.5",
-    "date-fns": "^3.6.0",
-    "dotenv": "^16.6.1",
     "express": "^4.19.2",
-    "multer": "^2.0.2",
-    "node-cron": "^3.0.3",
-    "nodemailer": "^7.0.5",
-    "react-router-dom": "^7.8.2",
-    "zod": "^3.23.8"
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/multer": "^2.0.0",
-    "@types/node": "^22.17.2",
-    "@types/node-cron": "^3.0.11",
-    "@types/nodemailer": "^7.0.1",
-    "@types/react": "^19.1.11",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^20.14.10",
     "prisma": "^5.22.0",
-    "tailwindcss": "^4.1.12",
     "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.4"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.cjs"
   }
 }

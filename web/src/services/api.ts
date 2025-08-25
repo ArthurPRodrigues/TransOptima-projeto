@@ -1,3 +1,4 @@
+// Camada de acesso à API. Mantém o prefixo /api (proxy no Vite).
 export const API_BASE = "/api";
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
@@ -12,11 +13,12 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+// Tipos básicos
 export type Documento = {
   id: string;
   tipo: string;
   nomeArquivo: string;
-  vencimento?: string;
+  vencimento?: string | null;
   valido?: boolean;
 };
 
@@ -29,6 +31,7 @@ export type Transportadora = {
 };
 
 export const api = {
+  // LISTAR transportadoras com paginação/filtros
   listTransportadoras: (params: { page?: number; size?: number; q?: string; uf?: string }) => {
     const p = new URLSearchParams();
     if (params.page != null) p.set("page", String(params.page));
@@ -44,15 +47,18 @@ export const api = {
     }>(`/transportadoras?${p.toString()}`);
   },
 
-  counts: () => http<{
-    transportadorasAtivas: number;
-    documentosVencendo30d: number;
-    indisponiveisParaFrete: number;
-  }>(`/dashboard/counts`),
+  // COUNTS do dashboard
+  counts: () =>
+    http<{
+      transportadorasAtivas: number;
+      documentosVencendo30d: number;
+      indisponiveisParaFrete: number;
+    }>(`/dashboard/counts`),
 
-  listDocumentosByTransportadora: (id: string) =>
-    http<Documento[]>(`/transportadoras/${id}/documentos`),
+  // DOCUMENTOS
+  listDocumentosByTransportadora: (id: string) => http<Documento[]>(`/transportadoras/${id}/documentos`),
 
+  // Criar transportadora
   createTransportadora: (payload: { nome: string; cnpj: string; uf: string }) =>
     fetch(API_BASE + "/transportadoras", {
       method: "POST",
@@ -63,6 +69,7 @@ export const api = {
       return r.json();
     }),
 
+  // Upload de documento (FormData)
   uploadDocumento: (transportadoraId: string, data: { tipo: string; vencimento?: string; arquivo: File }) => {
     const form = new FormData();
     form.append("tipo", data.tipo);
@@ -74,6 +81,22 @@ export const api = {
     }).then(async (r) => {
       if (!r.ok) throw new Error(await r.text());
       return r.json();
-    })
+    });
+  },
+
+  // ------------ NOVO: resolver ID por CNPJ ------------
+  getTransportadoraByCnpj: async (cnpj: string) => {
+    const clean = cnpj.replace(/\D/g, "");
+    const res = await api.listTransportadoras({ page: 0, size: 1, q: clean });
+    const first = res.content[0];
+    if (!first) return null;
+    // Se quiser checar igualdade exata:
+    // if (first.cnpj.replace(/\D/g,"") !== clean) return null;
+    return first;
+  },
+
+  resolveTransportadoraIdByCnpj: async (cnpj: string) => {
+    const t = await api.getTransportadoraByCnpj(cnpj);
+    return t?.id ?? null;
   },
 };

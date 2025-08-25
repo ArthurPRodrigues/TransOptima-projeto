@@ -1,29 +1,30 @@
 import { useEffect, useState } from "react";
 import { api, Documento } from "../services/api";
 
-// Tipos de documentos disponíveis no menu
+// Menu de tipos de documento
 const DOC_TYPES = [
-  "ANVISA",
-  "ANTT",
-  "CRLV",
-  "CNH",
-  "Seguro",
-  "Alvará",
-  "Contrato",
+  "ANVISA", 
+  "ANTT", 
+  "CRLV", 
+  "CNH", 
+  "Seguro", 
+  "Alvará", 
+  "Contrato"
 ];
 
 export default function DocumentosPage() {
   const [docs, setDocs] = useState<Documento[]>([]);
 
-  // Agora buscamos por CNPJ em vez de ID
+  // Agora buscamos por CNPJ (não mais por ID direto)
   const [cnpj, setCnpj] = useState("");
   const [transportadoraId, setTransportadoraId] = useState<string | null>(null);
 
-  // campos do form
+  // Campos do formulário
   const [tipo, setTipo] = useState(DOC_TYPES[0]);
   const [vencimento, setVencimento] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
 
+  // Resolve ID a partir do CNPJ e carrega documentos
   const carregarPorCnpj = async () => {
     if (!cnpj.trim()) return;
     const id = await api.resolveTransportadoraIdByCnpj(cnpj.trim());
@@ -36,7 +37,6 @@ export default function DocumentosPage() {
     setDocs(list);
   };
 
-  // quando resolver o ID, carrega a lista
   useEffect(() => {
     recarregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -46,7 +46,7 @@ export default function DocumentosPage() {
     e.preventDefault();
     if (!arquivo || !tipo) return;
 
-    // garante que temos o ID mesmo se o usuário só preencheu CNPJ e não clicou "Carregar"
+    // Garante ID mesmo que o usuário não clique no botão "Carregar"
     let id = transportadoraId;
     if (!id) {
       id = await api.resolveTransportadoraIdByCnpj(cnpj.trim());
