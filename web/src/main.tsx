@@ -1,16 +1,12 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { createRoot } from "react-dom/client";
 import App from "./App";
-import "./index.css";
 
-const rootElement = document.getElementById("root") as HTMLElement;
+const root = document.getElementById("root");
+if(!root) throw new Error("Elemento #root não encontrado");
 
-ReactDOM.createRoot(rootElement).render(
+createRoot(root).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <App />
   </React.StrictMode>
 );
-

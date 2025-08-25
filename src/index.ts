@@ -4,6 +4,7 @@ import transportadoras from "./routes/transportadoras";
 import tipoDocumento from "./routes/tipoDocumento";
 import documentos from "./routes/documentos";
 import { errorHandler } from "./middlewares/error";
+import dashboard from "./routes/dashboard"; 
 
 const app = express();
 app.use(express.json());
@@ -24,6 +25,7 @@ app.use("/uploads", express.static(path.resolve(process.env.UPLOAD_DIR || "uploa
 // Rotas da API
 app.use("/api/transportadoras", transportadoras);
 app.use("/api/tipos-documento", tipoDocumento);
+app.use("/api/dashboard", dashboard);
 app.use("/api", documentos); // contém /transportadoras/:cnpj/documentos e /documentos/:id/...
 
 // Middleware de erro (fica por último)

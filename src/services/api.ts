@@ -1,62 +1,91 @@
-// Camada de acesso à API. Usa o proxy /api definido no vite.config.ts
-export const API_BASE = "/api";
-
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(API_BASE + path, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status} - ${text || res.statusText}`);
-  }
-  return (await res.json()) as T;
-}
-
-export const api = {
-  // Transportadoras
-  listTransportadoras: (params: {
-    page?: number; size?: number; q?: string; uf?: string;
-  }) => {
-    const p = new URLSearchParams();
-    if (params.page != null) p.set("page", String(params.page));
-    if (params.size != null) p.set("size", String(params.size));
-    if (params.q) p.set("q", params.q);
-    if (params.uf) p.set("uf", params.uf);
-    return http<{
-      content: Transportadora[];
-      totalElements: number;
-      totalPages: number;
-      page: number;
-      size: number;
-    }>(`/transportadoras?${p.toString()}`);
-  },
-
-  // Contagens para o dashboard
-  counts: () => http<{
-    transportadorasAtivas: number;
-    documentosVencendo30d: number;
-    indisponiveisParaFrete: number;
-  }>(`/dashboard/counts`),
-
-  // Documentos (lista simples por transportadora, V1)
-  listDocumentosByTransportadora: (id: string) =>
-    http<Documento[]>(`/transportadoras/${id}/documentos`),
-};
-
-// Tipos básicos (ajuste se sua API retornar campos diferentes)
-export type Documento = {
-  id: string;
-  tipo: string;
-  nomeArquivo: string;
-  vencimento?: string; // ISO
-  valido?: boolean;
+// src/services/api.ts
+export type TransportadoraPayload = {
+  nome: string;
+  cnpj: string;
+  uf: string;
 };
 
 export type Transportadora = {
-  id: string;
+  id: number;
   nome: string;
   cnpj: string;
   uf: string;
   disponivelParaFrete?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
+
+// MESMO BASE_URL já usado no create:
+const BASE_URL = "http://localhost:3000";
+
+async function createTransportadora(body: TransportadoraPayload): Promise<void> {
+  const res = await fetch(`${BASE_URL}/transportadoras`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const data = await res.json(); msg = data?.message || data?.error || msg; }
+    catch { try { msg = (await res.text()) || msg; } catch {} }
+    throw new Error(msg);
+  }
+}
+
+async function listTransportadoras(): Promise<Transportadora[]> {
+  const res = await fetch(`${BASE_URL}/transportadoras`, {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const data = await res.json(); msg = data?.message || data?.error || msg; }
+    catch { try { msg = (await res.text()) || msg; } catch {} }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function listDocumentos(transportadoraId?: number): Promise<Document[]> {
+  const res = await fetch(`${BASE_URL}/documentos?transportadoraId=${transportadoraId}`, {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const data = await res.json(); msg = data?.message || data?.error || msg; }
+    catch { try { msg = (await res.text()) || msg; } catch {} }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function uploadDocumento(data: {
+  transportadoraId: number;
+  tipo: string;
+  numero: string;
+  emissao: string;
+  validade: string;
+  arquivo: File;
+}): Promise<void> {
+  const formData = new FormData();
+  formData.append("transportadoraId", String(data.transportadoraId));
+  formData.append("tipo", data.tipo);
+  formData.append("numero", data.numero);
+  formData.append("emissao", data.emissao);
+  formData.append("validade", data.validade);
+  formData.append("arquivo", data.arquivo);
+
+  const res = await fetch(`${BASE_URL}/documentos`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const data = await res.json(); msg = data?.message || data?.error || msg; }
+    catch { try { msg = (await res.text()) || msg; } catch {} }
+    throw new Error(msg);
+  }
+}
+
+export const api = { createTransportadora, listTransportadoras, listDocumentos, uploadDocumento };

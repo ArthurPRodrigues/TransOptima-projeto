@@ -15,8 +15,12 @@ export default function Login() {
     try {
       await login(email, password)
       window.location.href = '/'
-    } catch (err: any) {
-      setError(err.message || 'Erro ao fazer login')
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Erro ao fazer login')
+      }
     } finally {
       setLoading(false)
     }

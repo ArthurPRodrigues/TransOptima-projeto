@@ -1,31 +1,51 @@
-import { useEffect, useState } from "react";
-import { api } from "../services/api";
+import React, { useEffect, useState } from "react";
 
-function Card(props: { title: string; value?: number | string }) {
-  return (
-    <div className="bg-white rounded-2xl shadow p-5 border">
-      <h2 className="text-lg font-semibold mb-2">{props.title}</h2>
-      <div className="text-3xl font-bold text-gray-900">{props.value ?? "—"}</div>
-    </div>
-  );
-}
+type Counts = {
+  transportadorasAtivas: number;
+  documentosVencendo30d: number;
+  indisponiveisParaFrete: number;
+};
 
 export default function Dashboard() {
-  const [data, setData] = useState<{
-    transportadorasAtivas: number;
-    documentosVencendo30d: number;
-    indisponiveisParaFrete: number;
-  }>();
+  const [data, setData] = useState<Counts | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function fetchCounts(): Promise<Counts> {
+    const res = await fetch("/api/dashboard/counts");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const j = await res.json();
+    return {
+      transportadorasAtivas: Number(j.transportadorasAtivas ?? 0),
+      documentosVencendo30d: Number(j.documentosVencendo30d ?? 0),
+      indisponiveisParaFrete: Number(j.indisponiveisParaFrete ?? 0),
+    };
+  }
 
   useEffect(() => {
-    api.counts().then(setData).catch(console.error);
+    (async () => {
+      try {
+        setErr(null);
+        const data = await fetchCounts();
+        setData(data);
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : "Erro ao carregar");
+      }
+    })();
   }, []);
 
+  if (err) return <div style={{ color: "crimson" }}>Erro: {err}</div>;
+  if (!data) return <div>Carregando…</div>;
+
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <Card title="Transportadoras ativas" value={data?.transportadorasAtivas ?? 0} />
-      <Card title="Documentos a vencer (30d)" value={data?.documentosVencendo30d ?? 0} />
-      <Card title="Indisponíveis p/ frete" value={data?.indisponiveisParaFrete ?? 0} />
+    <div style={{ fontFamily: "system-ui" }}>
+      <h2>Transportadoras ativas</h2>
+      <div>{data.transportadorasAtivas}</div>
+
+      <h2 style={{ marginTop: 24 }}>Documentos a vencer (30d)</h2>
+      <div>{data.documentosVencendo30d}</div>
+
+      <h2 style={{ marginTop: 24 }}>Indisponíveis p/ frete</h2>
+      <div>{data.indisponiveisParaFrete}</div>
     </div>
   );
 }
