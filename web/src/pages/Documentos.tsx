@@ -1,49 +1,34 @@
 import { useEffect, useState } from "react";
-
-const API = import.meta.env.VITE_API_URL;
-
-type Documento = {
-  id: number;
-  tipo: string;
-  emissao: string;
-  vencimento: string;
-  transportadoraId: number;
-};
+import { api } from "../api";
+import type { Documento } from "../types";
 
 export default function Documentos() {
   const [docs, setDocs] = useState<Documento[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [transportadoraId, setTransportadoraId] = useState<string>("");
 
-  useEffect(() => {
-    // demo simples: carrega todos (ajuste para o seu endpoint real)
-    (async () => {
-      try {
-        const res = await fetch(`${API}/documentos`);
-        if (res.ok) {
-          const json = await res.json();
-          setDocs(Array.isArray(json) ? json : []);
-        }
-      } catch {}
-    })();
-  }, []);
+  async function load() {
+    try {
+      const arr = await api.listDocumentos();
+      setDocs(Array.isArray(arr) ? arr : []);
+    } catch { /* empty */ }
+  }
+
+  useEffect(() => { load(); }, []);
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !transportadoraId) return;
-
     const form = new FormData();
     form.append("arquivo", file);
-    // ajuste a chave conforme seu backend (tipoDocumentoId etc.)
     try {
-      const res = await fetch(`${API}/transportadoras/${transportadoraId}/documentos`, {
-        method: "POST",
-        body: form
-      });
-      if (res.ok) alert("Upload realizado.");
-      else alert("Falha no upload.");
-    } catch {
-      alert("Erro no upload.");
+      await api.uploadDocumento(Number(transportadoraId), form);
+      setFile(null);
+      setTransportadoraId("");
+      await load();
+      alert("Upload realizado.");
+    } catch (err: any) {
+      alert("Erro no upload: " + err.message);
     }
   }
 
@@ -59,7 +44,6 @@ export default function Documentos() {
                 <span className="form__label">Transportadora ID</span>
                 <input className="input" value={transportadoraId} onChange={e => setTransportadoraId(e.target.value)} placeholder="ex.: 1" />
               </label>
-
               <label className="form__field">
                 <span className="form__label">Arquivo</span>
                 <input className="input" type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} />
@@ -84,15 +68,13 @@ export default function Documentos() {
                 </tr>
               </thead>
               <tbody>
-                {docs.length === 0 && (
-                  <tr><td colSpan={5}>Sem documentos cadastrados.</td></tr>
-                )}
+                {docs.length === 0 && <tr><td colSpan={5}>Sem documentos cadastrados.</td></tr>}
                 {docs.map(d => (
                   <tr key={d.id}>
                     <td>{d.id}</td>
-                    <td>{d.tipo}</td>
-                    <td>{d.emissao}</td>
-                    <td>{d.vencimento}</td>
+                    <td>{d.tipo ?? d.tipoDocumentoId ?? "-"}</td>
+                    <td>{d.emissao ?? "-"}</td>
+                    <td>{d.vencimento ?? "-"}</td>
                     <td>{d.transportadoraId}</td>
                   </tr>
                 ))}
