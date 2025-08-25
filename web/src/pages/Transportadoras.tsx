@@ -1,115 +1,85 @@
-import { useEffect, useMemo, useState } from "react";
-import { api, type Transportadora } from "../services/api";
-import { useDebounce } from "../hooks/useDeBounce";
+import { useEffect, useState } from "react";
 
-const UF_LIST = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+const API = import.meta.env.VITE_API_URL;
 
-export default function TransportadorasPage() {
-  const [q, setQ] = useState("");
-  const dq = useDebounce(q, 400);
-  const [uf, setUf] = useState("");
-  const [page, setPage] = useState(0);
-  const [size, setSize] = useState(10);
+type Transportadora = {
+  id: number;
+  razaoSocial: string;
+  cnpj: string;
+  uf: string;
+  quimicosControlados: boolean;
+  disponivelParaFrete?: boolean;
+};
 
-  const [rows, setRows] = useState<Transportadora[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  const canPrev = page > 0;
-  const canNext = page + 1 < totalPages;
+export default function Transportadoras() {
+  const [data, setData] = useState<Transportadora[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uf, setUf] = useState<string>("");
 
   useEffect(() => {
-    setLoading(true);
-    api
-      .listTransportadoras({ page, size, q: dq.trim(), uf })
-      .then((res) => {
-        setRows(res.content);
-        setTotal(res.totalElements);
-        setTotalPages(res.totalPages);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [page, size, dq, uf]);
+    (async () => {
+      try {
+        const res = await fetch(`${API}/transportadoras`);
+        const json = await res.json();
+        setData(Array.isArray(json) ? json : []);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  const info = useMemo(
-    () => `Página ${page + 1} de ${Math.max(totalPages, 1)} — ${total} registro(s)`,
-    [page, totalPages, total]
-  );
+  const filtered = uf ? data.filter(d => d.uf === uf) : data;
 
   return (
-    <div className="bg-white rounded-2xl shadow border p-5">
-      <div className="flex flex-col md:flex-row gap-3 md:items-end mb-4">
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">Buscar por nome/CNPJ</label>
-          <input
-            value={q}
-            onChange={(e) => { setQ(e.target.value); setPage(0); }}
-            placeholder="Ex.: Trans XYZ ou 00.000.000/0000-00"
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-gray-900/10"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">UF</label>
-          <select
-            value={uf}
-            onChange={(e) => { setUf(e.target.value); setPage(0); }}
-            className="rounded-lg border px-3 py-2"
-          >
-            <option value="">Todas</option>
-            {UF_LIST.map(u => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Tamanho</label>
-          <select value={size} onChange={(e)=>{ setSize(Number(e.target.value)); setPage(0); }} className="rounded-lg border px-3 py-2">
-            {[5,10,20,50].map(s=><option key={s} value={s}>{s}/página</option>)}
-          </select>
-        </div>
-      </div>
+    <section className="container">
+      <div className="panel">
+        <div className="panel__header">Transportadoras</div>
+        <div className="panel__body">
+          <div className="form__row">
+            <label className="form__field" style={{maxWidth: 220}}>
+              <span className="form__label">Filtrar por UF</span>
+              <select value={uf} onChange={e => setUf(e.target.value)} className="input">
+                <option value="">Todas</option>
+                {["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"].map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-      <div className="overflow-auto">
-        <table className="min-w-full border rounded-xl overflow-hidden">
-          <thead className="bg-gray-50">
-            <tr className="text-left text-sm">
-              <th className="px-3 py-2 border-b">Nome</th>
-              <th className="px-3 py-2 border-b">CNPJ</th>
-              <th className="px-3 py-2 border-b">UF</th>
-              <th className="px-3 py-2 border-b">Disponível p/ frete</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={4} className="px-3 py-6 text-center text-gray-500">Carregando…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-6 text-center text-gray-500">Nenhum registro</td></tr>
-            ) : (
-              rows.map(r => (
-                <tr key={r.id} className="text-sm hover:bg-gray-50">
-                  <td className="px-3 py-2 border-b">{r.nome}</td>
-                  <td className="px-3 py-2 border-b">{r.cnpj}</td>
-                  <td className="px-3 py-2 border-b">{r.uf}</td>
-                  <td className="px-3 py-2 border-b">
-                    <span className={`inline-block px-2 py-1 rounded-lg text-xs ${
-                      r.disponivelParaFrete ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                    }`}>
-                      {r.disponivelParaFrete ? "Disponível" : "Indisponível"}
-                    </span>
-                  </td>
+          <div className="table__wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Razão Social</th>
+                  <th>CNPJ</th>
+                  <th>UF</th>
+                  <th>Controla Químicos?</th>
+                  <th>Disponível p/ Frete</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr><td colSpan={5}>Carregando…</td></tr>
+                )}
+                {!loading && filtered.length === 0 && (
+                  <tr><td colSpan={5}>Nenhuma transportadora encontrada.</td></tr>
+                )}
+                {!loading && filtered.map(t => (
+                  <tr key={t.id}>
+                    <td>{t.razaoSocial}</td>
+                    <td>{t.cnpj}</td>
+                    <td>{t.uf}</td>
+                    <td>{t.quimicosControlados ? "Sim" : "Não"}</td>
+                    <td>{t.disponivelParaFrete === false ? "Não" : "Sim"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      <div className="flex items-center justify-between mt-4">
-        <span className="text-sm text-gray-600">{info}</span>
-        <div className="flex gap-2">
-          <button className="px-3 py-2 rounded-lg border disabled:opacity-50" disabled={!canPrev} onClick={()=> setPage(p => Math.max(p-1,0))}>◀ Anterior</button>
-          <button className="px-3 py-2 rounded-lg border disabled:opacity-50" disabled={!canNext} onClick={()=> setPage(p => p+1)}>Próxima ▶</button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
