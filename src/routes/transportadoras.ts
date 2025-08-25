@@ -1,89 +1,148 @@
+// src/routes/transportadoras.ts
 import { Router } from "express";
 import prisma from "../prisma";
-import { onlyDigits } from "../utils/cnpj";
 
 const router = Router();
 
-/** Criar */
-router.post("/", async (req, res, next) => {
+/** Util: remove tudo que não for dígito (aceita CNPJ com/sem máscara) */
+function onlyDigits(cnpj: string) {
+  return (cnpj || "").replace(/\D+/g, "");
+}
+
+/**
+ * POST /api/transportadoras
+ * Cria uma transportadora
+ * Body: { nome: string, cnpj: string, uf?: string, quimicosControlados?: boolean }
+ */
+router.post("/", async (req, res) => {
   try {
     const { nome, cnpj, uf, quimicosControlados } = req.body || {};
-    if (!nome || !cnpj) throw new Error("Campos obrigatórios: nome e cnpj.");
+
+    if (!nome || !cnpj) {
+      return res.status(400).json({ error: "Campos obrigatórios: nome e cnpj." });
+    }
+
+    const cnpjNum = onlyDigits(cnpj);
+    if (!cnpjNum) {
+      return res.status(400).json({ error: "CNPJ inválido." });
+    }
 
     const created = await prisma.transportadora.create({
       data: {
         nome: String(nome).trim(),
-        cnpj: onlyDigits(cnpj),
+        cnpj: cnpjNum,
         uf: uf ? String(uf).toUpperCase().slice(0, 2) : null,
-        quimicosControlados: !!quimicosControlados
-      }
+        quimicosControlados: !!quimicosControlados,
+      },
     });
-    res.status(201).json(created);
-  } catch (e) {
-    next(e);
+
+    return res.status(201).json(created);
+  } catch (e: any) {
+    if (e?.code === "P2002" && e?.meta?.target?.includes("cnpj")) {
+      return res.status(400).json({ error: "CNPJ já cadastrado." });
+    }
+    return res.status(400).json({ error: e?.message || "Erro ao criar transportadora." });
   }
 });
 
-/** Listar (filtros: uf, disponivelParaFrete) */
-router.get("/", async (req, res, next) => {
+/**
+ * GET /api/transportadoras
+ * Lista transportadoras (filtros opcionais: ?uf=SC&disponivelParaFrete=true)
+ */
+router.get("/", async (req, res) => {
   try {
-    const { uf, disponivelParaFrete } = req.query as any;
+    const { uf, disponivelParaFrete } = req.query as {
+      uf?: string;
+      disponivelParaFrete?: string;
+    };
+
     const list = await prisma.transportadora.findMany({
       where: {
         uf: uf ? String(uf).toUpperCase().slice(0, 2) : undefined,
-        ...(disponivelParaFrete !== undefined
+        ...(typeof disponivelParaFrete !== "undefined"
           ? { disponivelParaFrete: String(disponivelParaFrete) === "true" }
-          : {})
+          : {}),
       },
       orderBy: { nome: "asc" },
-      select: { id: true, nome: true, cnpj: true, uf: true, disponivelParaFrete: true }
+      select: { id: true, nome: true, cnpj: true, uf: true, disponivelParaFrete: true },
     });
-    res.json(list);
-  } catch (e) {
-    next(e);
+
+    return res.json(list);
+  } catch (e: any) {
+    return res.status(400).json({ error: e?.message || "Erro ao listar transportadoras." });
   }
 });
 
-/** Buscar por CNPJ */
-router.get("/:cnpj", async (req, res, next) => {
+/**
+ * GET /api/transportadoras/:cnpj
+ * Busca uma transportadora por CNPJ (com ou sem máscara)
+ */
+router.get("/:cnpj", async (req, res) => {
   try {
     const cnpj = onlyDigits(req.params.cnpj);
+    if (!cnpj) return res.status(400).json({ error: "CNPJ inválido." });
+
     const t = await prisma.transportadora.findUnique({ where: { cnpj } });
     if (!t) return res.status(404).json({ error: "Transportadora não encontrada." });
-    res.json(t);
-  } catch (e) {
-    next(e);
+
+    return res.json(t);
+  } catch (e: any) {
+    return res.status(400).json({ error: e?.message || "Erro na busca por CNPJ." });
   }
 });
 
-/** Atualizar por CNPJ */
-router.put("/:cnpj", async (req, res, next) => {
+/**
+ * PUT /api/transportadoras/:cnpj
+ * Atualiza campos da transportadora
+ * Body: { nome?, uf?, quimicosControlados?, disponivelParaFrete? }
+ */
+router.put("/:cnpj", async (req, res) => {
   try {
     const cnpj = onlyDigits(req.params.cnpj);
+    if (!cnpj) return res.status(400).json({ error: "CNPJ inválido." });
+
     const { nome, uf, quimicosControlados, disponivelParaFrete } = req.body || {};
+
     const updated = await prisma.transportadora.update({
       where: { cnpj },
       data: {
         ...(nome !== undefined ? { nome: String(nome).trim() } : {}),
         ...(uf !== undefined ? { uf: uf ? String(uf).toUpperCase().slice(0, 2) : null } : {}),
-        ...(quimicosControlados !== undefined ? { quimicosControlados: !!quimicosControlados } : {}),
-        ...(disponivelParaFrete !== undefined ? { disponivelParaFrete: !!disponivelParaFrete } : {})
-      }
+        ...(typeof quimicosControlados !== "undefined"
+          ? { quimicosControlados: !!quimicosControlados }
+          : {}),
+        ...(typeof disponivelParaFrete !== "undefined"
+          ? { disponivelParaFrete: !!disponivelParaFrete }
+          : {}),
+      },
     });
-    res.json(updated);
-  } catch (e) {
-    next(e);
+
+    return res.json(updated);
+  } catch (e: any) {
+    // Se não existir, o Prisma lança P2025
+    if (e?.code === "P2025") {
+      return res.status(404).json({ error: "Transportadora não encontrada." });
+    }
+    return res.status(400).json({ error: e?.message || "Erro ao atualizar transportadora." });
   }
 });
 
-/** Deletar por CNPJ */
-router.delete("/:cnpj", async (req, res, next) => {
+/**
+ * DELETE /api/transportadoras/:cnpj
+ * Remove a transportadora (cascata apaga documentos)
+ */
+router.delete("/:cnpj", async (req, res) => {
   try {
     const cnpj = onlyDigits(req.params.cnpj);
+    if (!cnpj) return res.status(400).json({ error: "CNPJ inválido." });
+
     await prisma.transportadora.delete({ where: { cnpj } });
-    res.json({ ok: true });
-  } catch (e) {
-    next(e);
+    return res.json({ ok: true });
+  } catch (e: any) {
+    if (e?.code === "P2025") {
+      return res.status(404).json({ error: "Transportadora não encontrada." });
+    }
+    return res.status(400).json({ error: e?.message || "Erro ao remover transportadora." });
   }
 });
 

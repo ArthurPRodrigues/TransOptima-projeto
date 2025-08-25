@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, Documento } from "../services/api";
+import { api } from "../services/api";
+import type { Documento } from "../services/api";
 
 export default function DocumentosPage() {
   const [docs, setDocs] = useState<Documento[]>([]);
